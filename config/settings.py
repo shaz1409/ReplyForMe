@@ -1,0 +1,6 @@
+CLIENT_ID = "your_instagram_client_id"
+CLIENT_SECRET = "your_instagram_client_secret"
+REDIRECT_URI = "http://localhost:5000/auth/callback"
+AUTH_BASE_URL = "https://api.instagram.com/oauth/authorize"
+TOKEN_URL = "https://api.instagram.com/oauth/access_token"
+SCOPES = "user_profile,user_media"
