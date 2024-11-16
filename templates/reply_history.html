@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reply History</title>
+</head>
+<body>
+    <h1>Reply History for User {{ user_id }}</h1>
+    <ul>
+        {% for reply in replies %}
+            <li>{{ reply }}</li>
+        {% endfor %}
+    </ul>
+    <a href="/dashboard">Back to Dashboard</a>
+</body>
+</html>

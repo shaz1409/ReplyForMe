@@ -16,6 +16,7 @@ class User(Base):
     access_token = Column(Text, nullable=False)
     token_expiry = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
+    reply_tone = Column(String(20), default="positive") 
 
 # Initialize the database connection
 DATABASE_URL = "sqlite:///replyforme.db"  # SQLite URL (change to PostgreSQL for production)

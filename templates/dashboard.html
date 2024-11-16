@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>User Dashboard</title>
+</head>
+<body>
+    <h1>User Dashboard</h1>
+    <table border="1">
+        <thead>
+            <tr>
+                <th>Instagram User ID</th>
+                <th>Username</th>
+                <th>Token Expiry</th>
+                <th>Reply Tone</th>
+                <th>Actions</th>
+                <th>Reply History</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for user in users %}
+            <tr>
+                <td>{{ user.instagram_user_id }}</td>
+                <td>{{ user.username }}</td>
+                <td>{{ user.token_expiry or 'No Expiry Set' }}</td>
+                <td><a href="/reply_history/{{ user.instagram_user_id }}">View History</a></td>
+                <td>
+                    <!-- Form to update reply tone -->
+                    <form action="/set_tone/{{ user.instagram_user_id }}" method="POST">
+                        <select name="reply_tone">
+                            <option value="professional" {% if user.reply_tone == "professional" %}selected{% endif %}>Professional</option>
+                            <option value="happy" {% if user.reply_tone == "happy" %}selected{% endif %}>Happy</option>
+                            <option value="positive" {% if user.reply_tone == "positive" %}selected{% endif %}>Positive</option>
+                            <option value="love" {% if user.reply_tone == "love" %}selected{% endif %}>Love</option>
+                        </select>
+                        <button type="submit">Save</button>
+                    </form>
+                </td>
+                <td>
+                    <a href="/automate/{{ user.instagram_user_id }}">Run Automation</a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</body>
+</html>
