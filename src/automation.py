@@ -1,78 +1,224 @@
-from src.api import fetch_user_media, fetch_comments, post_reply
-from src.utils import generate_specific_response, log_action
-import time
+import requests
+from flask import request, redirect, session
+from src.database import SessionLocal, User
+from config.settings import (
+    CLIENT_ID, CLIENT_SECRET, REDIRECT_URI, AUTH_BASE_URL, TOKEN_URL, SCOPES,
+    TIKTOK_CLIENT_ID, TIKTOK_CLIENT_SECRET, TIKTOK_REDIRECT_URI,
+    YOUTUBE_CLIENT_ID, YOUTUBE_CLIENT_SECRET, YOUTUBE_REDIRECT_URI
+)
+from src.tiktok_api import fetch_user_videos as fetch_tiktok_videos, fetch_comments as fetch_tiktok_comments, post_comment_reply as post_tiktok_reply
+from src.youtube_api import fetch_user_videos as fetch_youtube_videos, fetch_comments as fetch_youtube_comments, post_comment_reply as post_youtube_reply
 
-# Reply log to keep track of replies per session
-reply_log = {}
-
-RATE_LIMIT = 5  # Limit to 5 replies per user per minute
-
-def can_reply(user_id):
+def initiate_oauth():
     """
-    Check if the user is within the rate limit for replies.
+    Redirects the user to Instagram's OAuth login page.
     """
-    current_time = time.time()
-    if user_id not in reply_log:
-        reply_log[user_id] = []
+    auth_url = (
+        f"{AUTH_BASE_URL}?client_id={CLIENT_ID}&redirect_uri={REDIRECT_URI}&scope={SCOPES}&response_type=code"
+    )
+    return redirect(auth_url)
 
-    # Remove logs older than 60 seconds
-    reply_log[user_id] = [t for t in reply_log[user_id] if current_time - t < 60]
-
-    # Allow reply if under the limit
-    return len(reply_log[user_id]) < RATE_LIMIT
-
-def log_reply(user_id, comment_id, response_message):
+@app.route("/instagram/auth/callback")
+def handle_callback():
     """
-    Log reply details to a file for auditing purposes.
+    Handles the callback from Instagram and exchanges the authorization code for an access token.
+    Saves the user information and access token to the database.
     """
-    with open("replies.log", "a") as log_file:
-        log_file.write(f"{time.strftime('%Y-%m-%d %H:%M:%S')} - User: {user_id} - Comment ID: {comment_id} - Reply: {response_message}\n")
+    code = request.args.get("code")
+    if not code:
+        return "Authorization failed!", 400
 
-def automate_replies(user_id):
+    # Exchange authorization code for access token
+    data = {
+        "client_id": CLIENT_ID,
+        "client_secret": CLIENT_SECRET,
+        "grant_type": "authorization_code",
+        "redirect_uri": REDIRECT_URI,
+        "code": code,
+    }
+
+    response = requests.post(TOKEN_URL, data=data)
+    if response.status_code != 200:
+        return f"Failed to fetch access token: {response.json()}", 400
+
+    token_data = response.json()
+    access_token = token_data.get("access_token")
+    user_id = token_data.get("user_id")
+
+    # Save to database
+    db = SessionLocal()
+    try:
+        existing_user = db.query(User).filter_by(instagram_user_id=user_id).first()
+        if not existing_user:
+            new_user = User(
+                instagram_user_id=user_id,
+                username=f"user_{user_id}",  # Replace with real username if available
+                access_token=access_token,
+                token_expiry=None  # Add expiration logic if needed
+            )
+            db.add(new_user)
+            db.commit()
+        else:
+            existing_user.access_token = access_token
+            db.commit()
+    finally:
+        db.close()
+
+    return f"User {user_id} authenticated and token saved!"
+
+def get_access_token(user_id):
     """
-    Automate fetching comments and posting tailored replies using ChatGPT.
+    Retrieves the access token for a specific user from the database.
     """
-    log_action("START_AUTOMATION", user_id, "Starting automation for user.")
+    db = SessionLocal()
+    try:
+        user = db.query(User).filter_by(instagram_user_id=user_id).first()
+        if user:
+            return user.access_token
+        else:
+            return None
+    finally:
+        db.close()
 
-    # Fetch user media (posts)
-    media = fetch_user_media(user_id)
-    if "error" in media:
-        log_action("ERROR", user_id, f"Error fetching media: {media['error']}")
-        return
+@app.route("/tiktok/auth")
+def tiktok_auth():
+    """
+    Redirect user to TikTok for authentication.
+    """
+    tiktok_auth_url = (
+        f"https://www.tiktok.com/auth/authorize"
+        f"?client_id={TIKTOK_CLIENT_ID}"
+        f"&redirect_uri={TIKTOK_REDIRECT_URI}"
+        f"&response_type=code"
+        f"&scope=video.list,comment.list,comment.write"
+    )
+    return redirect(tiktok_auth_url)
 
-    # Loop through each post
-    for post in media.get("data", []):
-        media_id = post["id"]
-        log_action("PROCESS_MEDIA", user_id, f"Processing media ID: {media_id}")
+@app.route("/tiktok/auth/callback")
+def tiktok_callback():
+    """
+    Handles TikTok OAuth callback.
+    """
+    code = request.args.get("code")
+    if not code:
+        return "TikTok Authorization failed!", 400
 
-        # Fetch comments for the post
-        comments = fetch_comments(media_id, user_id)
-        if "error" in comments:
-            log_action("ERROR", user_id, f"Error fetching comments for media ID {media_id}: {comments['error']}")
-            continue
+    # Exchange authorization code for access token
+    data = {
+        "client_id": TIKTOK_CLIENT_ID,
+        "client_secret": TIKTOK_CLIENT_SECRET,
+        "grant_type": "authorization_code",
+        "redirect_uri": TIKTOK_REDIRECT_URI,
+        "code": code,
+    }
 
-        # Process each comment
+    response = requests.post("https://open.tiktokapis.com/v1/oauth/token", json=data)
+    if response.status_code != 200:
+        return f"Failed to fetch TikTok access token: {response.json()}", 400
+
+    token_data = response.json()
+    access_token = token_data.get("access_token")
+    open_id = token_data.get("open_id")
+
+    # Save to database
+    db = SessionLocal()
+    try:
+        existing_user = db.query(User).filter_by(tiktok_user_id=open_id).first()
+        if not existing_user:
+            new_user = User(
+                tiktok_user_id=open_id,
+                tiktok_access_token=access_token
+            )
+            db.add(new_user)
+            db.commit()
+        else:
+            existing_user.tiktok_access_token = access_token
+            db.commit()
+    finally:
+        db.close()
+
+    return f"TikTok user {open_id} authenticated and token saved!"
+
+@app.route("/youtube/auth")
+def youtube_auth():
+    """
+    Redirect user to YouTube for authentication.
+    """
+    youtube_auth_url = (
+        f"https://accounts.google.com/o/oauth2/v2/auth"
+        f"?client_id={YOUTUBE_CLIENT_ID}"
+        f"&redirect_uri={YOUTUBE_REDIRECT_URI}"
+        f"&response_type=code"
+        f"&scope=https://www.googleapis.com/auth/youtube.force-ssl"
+    )
+    return redirect(youtube_auth_url)
+
+@app.route("/youtube/auth/callback")
+def youtube_callback():
+    """
+    Handles YouTube OAuth callback.
+    """
+    code = request.args.get("code")
+    if not code:
+        return "YouTube Authorization failed!", 400
+
+    # Exchange authorization code for access token
+    data = {
+        "client_id": YOUTUBE_CLIENT_ID,
+        "client_secret": YOUTUBE_CLIENT_SECRET,
+        "grant_type": "authorization_code",
+        "redirect_uri": YOUTUBE_REDIRECT_URI,
+        "code": code,
+    }
+
+    response = requests.post("https://oauth2.googleapis.com/token", data=data)
+    if response.status_code != 200:
+        return f"Failed to fetch YouTube access token: {response.json()}", 400
+
+    token_data = response.json()
+    access_token = token_data.get("access_token")
+    user_info = requests.get(
+        "https://www.googleapis.com/oauth2/v2/userinfo",
+        headers={"Authorization": f"Bearer {access_token}"}
+    ).json()
+
+    youtube_user_id = user_info.get("id")
+
+    # Save to database
+    db = SessionLocal()
+    try:
+        existing_user = db.query(User).filter_by(youtube_user_id=youtube_user_id).first()
+        if not existing_user:
+            new_user = User(
+                youtube_user_id=youtube_user_id,
+                youtube_access_token=access_token
+            )
+            db.add(new_user)
+            db.commit()
+        else:
+            existing_user.youtube_access_token = access_token
+            db.commit()
+    finally:
+        db.close()
+
+    return f"YouTube user {youtube_user_id} authenticated and token saved!"
+
+def automate_tiktok_replies(user_id):
+    # Fetch TikTok videos and comments
+    videos = fetch_tiktok_videos(user_id)
+    for video in videos.get("data", []):
+        video_id = video["id"]
+        comments = fetch_tiktok_comments(video_id, user_id)
         for comment in comments.get("data", []):
-            comment_id = comment["id"]
-            text = comment["text"]
-            log_action("PROCESS_COMMENT", user_id, f"Analyzing comment: {text}")
+            reply = generate_specific_response(comment["text"], user_id)
+            post_tiktok_reply(comment["id"], reply, user_id)
 
-            # Rate limiting check
-            if not can_reply(user_id):
-                log_action("RATE_LIMIT", user_id, "Rate limit reached. Skipping reply.")
-                continue
-
-            # Generate a response based on user-selected tone
-            response_message = generate_specific_response(text, user_id)
-            log_action("GENERATE_RESPONSE", user_id, f"Generated response: {response_message}")
-
-            # Post the reply
-            response = post_reply(comment_id, response_message, user_id)
-            if "error" in response:
-                log_action("ERROR", user_id, f"Error replying to comment {comment_id}: {response['error']}")
-            else:
-                log_action("REPLY_SUCCESS", user_id, f"Replied to comment {comment_id}: {response}")
-                log_reply(user_id, comment_id, response_message)
-
-                # Add the reply to the rate limit log
-                reply_log[user_id].append(time.time())
+def automate_youtube_replies(user_id):
+    # Fetch YouTube videos and comments
+    videos = fetch_youtube_videos(user_id)
+    for video in videos.get("items", []):
+        video_id = video["id"]["videoId"]
+        comments = fetch_youtube_comments(video_id, user_id)
+        for comment in comments.get("items", []):
+            reply = generate_specific_response(comment["snippet"]["topLevelComment"]["snippet"]["textDisplay"], user_id)
+            post_youtube_reply(comment["id"], reply, user_id)

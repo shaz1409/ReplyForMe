@@ -10,38 +10,78 @@
     <table border="1">
         <thead>
             <tr>
-                <th>Instagram User ID</th>
-                <th>Username</th>
-                <th>Token Expiry</th>
-                <th>Reply Tone</th>
-                <th>Actions</th>
-                <th>Reply History</th>
+                <th>Platform</th>
+                <th>Details</th>
+                <th>Enable Automation</th>
             </tr>
         </thead>
         <tbody>
-            {% for user in users %}
             <tr>
-                <td>{{ user.instagram_user_id }}</td>
-                <td>{{ user.username }}</td>
-                <td>{{ user.token_expiry or 'No Expiry Set' }}</td>
-                <td><a href="/reply_history/{{ user.instagram_user_id }}">View History</a></td>
+                <td>Instagram</td>
                 <td>
-                    <!-- Form to update reply tone -->
-                    <form action="/set_tone/{{ user.instagram_user_id }}" method="POST">
-                        <select name="reply_tone">
-                            <option value="professional" {% if user.reply_tone == "professional" %}selected{% endif %}>Professional</option>
-                            <option value="happy" {% if user.reply_tone == "happy" %}selected{% endif %}>Happy</option>
-                            <option value="positive" {% if user.reply_tone == "positive" %}selected{% endif %}>Positive</option>
-                            <option value="love" {% if user.reply_tone == "love" %}selected{% endif %}>Love</option>
+                    <p>User ID: {{ user.instagram_user_id }}</p>
+                    <p>Access Token: {{ user.instagram_access_token }}</p>
+                </td>
+                <td>
+                    <form action="/enable_instagram/{{ user.instagram_user_id }}" method="POST">
+                        <button type="submit">Enable</button>
+                    </form>
+                    <form action="/set_sentiment/instagram/{{ user.instagram_user_id }}" method="POST">
+                        <label for="sentiment">Choose Sentiment:</label>
+                        <select name="sentiment" id="sentiment">
+                            <option value="positive">Positive</option>
+                            <option value="professional">Professional</option>
+                            <option value="happy">Happy</option>
+                            <option value="love">Love</option>
                         </select>
-                        <button type="submit">Save</button>
+                        <button type="submit">Set Sentiment</button>
                     </form>
                 </td>
+            </tr>
+            <tr>
+                <td>TikTok</td>
                 <td>
-                    <a href="/automate/{{ user.instagram_user_id }}">Run Automation</a>
+                    <p>User ID: {{ user.tiktok_user_id }}</p>
+                    <p>Access Token: {{ user.tiktok_access_token }}</p>
+                </td>
+                <td>
+                    <form action="/enable_tiktok/{{ user.tiktok_user_id }}" method="POST">
+                        <button type="submit">Enable</button>
+                    </form>
+                    <form action="/set_sentiment/tiktok/{{ user.tiktok_user_id }}" method="POST">
+                        <label for="sentiment">Choose Sentiment:</label>
+                        <select name="sentiment" id="sentiment">
+                            <option value="positive">Positive</option>
+                            <option value="professional">Professional</option>
+                            <option value="happy">Happy</option>
+                            <option value="love">Love</option>
+                        </select>
+                        <button type="submit">Set Sentiment</button>
+                    </form>
                 </td>
             </tr>
-            {% endfor %}
+            <tr>
+                <td>YouTube</td>
+                <td>
+                    <p>User ID: {{ user.youtube_user_id }}</p>
+                    <p>Access Token: {{ user.youtube_access_token }}</p>
+                </td>
+                <td>
+                    <form action="/enable_youtube/{{ user.youtube_user_id }}" method="POST">
+                        <button type="submit">Enable</button>
+                    </form>
+                    <form action="/set_sentiment/youtube/{{ user.youtube_user_id }}" method="POST">
+                        <label for="sentiment">Choose Sentiment:</label>
+                        <select name="sentiment" id="sentiment">
+                            <option value="positive">Positive</option>
+                            <option value="professional">Professional</option>
+                            <option value="happy">Happy</option>
+                            <option value="love">Love</option>
+                        </select>
+                        <button type="submit">Set Sentiment</button>
+                    </form>
+                </td>
+            </tr>
         </tbody>
     </table>
 </body>

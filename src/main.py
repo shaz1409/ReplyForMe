@@ -4,7 +4,9 @@ from flask import Flask, render_template
 from flask import request, redirect
 from src.database import SessionLocal, User  # Import the database session and User model
 from src.automation import automate_replies
-
+from src.main import app
+from flask import redirect
+from src.database import SessionLocal
 
 app = Flask(__name__)
 app.secret_key = "your_secret_key"  # Replace with a secure key for sessions
@@ -81,6 +83,35 @@ def reply_history(user_id):
 
     return render_template("reply_history.html", user_id=user_id, replies=user_replies)
 
+@app.route("/enable_instagram/<user_id>", methods=["POST"])
+def enable_instagram(user_id):
+    db = SessionLocal()
+    user = db.query(User).filter_by(instagram_user_id=user_id).first()
+    if user:
+        user.automation_enabled = True  # Add a field if needed
+        db.commit()
+    db.close()
+    return redirect("/dashboard")
+
+@app.route("/enable_tiktok/<user_id>", methods=["POST"])
+def enable_tiktok(user_id):
+    db = SessionLocal()
+    user = db.query(User).filter_by(tiktok_user_id=user_id).first()
+    if user:
+        user.automation_enabled = True  # Add a field if needed
+        db.commit()
+    db.close()
+    return redirect("/dashboard")
+
+@app.route("/enable_youtube/<user_id>", methods=["POST"])
+def enable_youtube(user_id):
+    db = SessionLocal()
+    user = db.query(User).filter_by(youtube_user_id=user_id).first()
+    if user:
+        user.automation_enabled = True  # Add a field if needed
+        db.commit()
+    db.close()
+    return redirect("/dashboard")
 
 if __name__ == "__main__":
     app.run(debug=True)

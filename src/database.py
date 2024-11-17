@@ -11,9 +11,13 @@ class User(Base):
     __tablename__ = 'users'
 
     id = Column(Integer, primary_key=True)
-    instagram_user_id = Column(String(50), unique=True, nullable=False)
+    instagram_user_id = Column(String(50), unique=True, nullable=True)
+    tiktok_user_id = Column(String(50), unique=True, nullable=True)
+    youtube_user_id = Column(String(50), unique=True, nullable=True)
+    instagram_access_token = Column(String, nullable=True)
+    tiktok_access_token = Column(String, nullable=True)
+    youtube_access_token = Column(String, nullable=True)
     username = Column(String(50), nullable=False)
-    access_token = Column(Text, nullable=False)
     token_expiry = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     reply_tone = Column(String(20), default="positive") 
